@@ -2,6 +2,7 @@
 app.py
 ------
 Flask backend for the Bank Customer Churn Prediction Web Application.
+Uses pure NumPy for model inference (no TensorFlow dependency).
 
 Routes:
   - "/" : Homepage with prediction form
@@ -11,10 +12,10 @@ Routes:
 from flask import Flask, render_template, request
 import numpy as np
 import pandas as pd
+import json
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.models import load_model
 
 # ============================================================
 # INITIALIZE FLASK APP
@@ -22,16 +23,46 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 # ============================================================
-# LOAD MODEL AND REBUILD PREPROCESSING OBJECTS
+# PURE NUMPY ANN INFERENCE
 # ============================================================
-print("Loading model and setting up preprocessing...")
 
-# Load the trained ANN model
-model = load_model('model.h5')
-print("[OK] Model loaded successfully!")
+def relu(x):
+    """ReLU activation function."""
+    return np.maximum(0, x)
+
+def sigmoid(x):
+    """Sigmoid activation function."""
+    return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
+
+def predict_ann(input_data, weights):
+    """
+    Forward pass through the ANN using pure NumPy.
+    Replicates: Input -> Dense(64,ReLU) -> Dense(32,ReLU) -> Dense(1,Sigmoid)
+    Note: Dropout is not applied during inference.
+    """
+    x = input_data
+    for i, layer in enumerate(weights):
+        w = np.array(layer['weights'])
+        b = np.array(layer['bias'])
+        x = np.dot(x, w) + b
+        # Apply activation: ReLU for hidden layers, Sigmoid for output
+        if i < len(weights) - 1:
+            x = relu(x)
+        else:
+            x = sigmoid(x)
+    return x
+
+# ============================================================
+# LOAD MODEL WEIGHTS AND SETUP PREPROCESSING
+# ============================================================
+print("Loading model weights and setting up preprocessing...")
+
+# Load ANN weights from JSON (extracted from trained Keras model)
+with open('model_weights.json', 'r') as f:
+    model_weights = json.load(f)
+print(f"[OK] Model weights loaded: {len(model_weights)} layers")
 
 # Rebuild preprocessing objects from the dataset
-# (This avoids pickle compatibility issues across Python versions)
 dataset = pd.read_csv('Artificial_Neural_Network_Case_Study_data.csv')
 X = dataset.iloc[:, 3:13].values
 y = dataset.iloc[:, 13].values
@@ -54,9 +85,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 sc = StandardScaler()
 sc.fit(X_train)
 
-feature_columns = list(dataset.columns[3:13])
-print("[OK] Preprocessing objects ready!")
-print(f"Feature columns: {feature_columns}")
+print("[OK] Preprocessing ready!")
 
 # ============================================================
 # ROUTES
@@ -111,8 +140,8 @@ def predict():
         # Apply the same StandardScaler
         input_data = sc.transform(input_data)
 
-        # Make prediction
-        prediction_prob = model.predict(input_data)[0][0]
+        # Make prediction using pure NumPy ANN
+        prediction_prob = float(predict_ann(input_data, model_weights)[0][0])
         prediction = int(prediction_prob > 0.5)
 
         # Determine result message
@@ -123,7 +152,7 @@ def predict():
             result = "Will Stay with the Bank"
             result_class = "positive"
 
-        probability = round(float(prediction_prob) * 100, 2)
+        probability = round(prediction_prob * 100, 2)
 
         return render_template(
             'index.html',
