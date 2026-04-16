@@ -8,9 +8,12 @@ Routes:
   - "/predict" : POST endpoint to get churn prediction
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import numpy as np
-import pickle
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import load_model
 
 # ============================================================
@@ -19,24 +22,40 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 # ============================================================
-# LOAD MODEL AND PREPROCESSING OBJECTS
+# LOAD MODEL AND REBUILD PREPROCESSING OBJECTS
 # ============================================================
-print("Loading model and preprocessing objects...")
+print("Loading model and setting up preprocessing...")
 
 # Load the trained ANN model
 model = load_model('model.h5')
 print("[OK] Model loaded successfully!")
 
-# Load preprocessing objects
-with open('preprocessing.pkl', 'rb') as f:
-    preprocessing = pickle.load(f)
+# Rebuild preprocessing objects from the dataset
+# (This avoids pickle compatibility issues across Python versions)
+dataset = pd.read_csv('Artificial_Neural_Network_Case_Study_data.csv')
+X = dataset.iloc[:, 3:13].values
+y = dataset.iloc[:, 13].values
 
-le_gender = preprocessing['label_encoder_gender']
-ct = preprocessing['column_transformer']
-sc = preprocessing['scaler']
-feature_columns = preprocessing['feature_columns']
+# Label encode Gender
+le_gender = LabelEncoder()
+X[:, 2] = le_gender.fit_transform(X[:, 2])
 
-print("[OK] Preprocessing objects loaded successfully!")
+# OneHot encode Geography
+ct = ColumnTransformer(
+    transformers=[('encoder', OneHotEncoder(drop='first'), [1])],
+    remainder='passthrough'
+)
+X = np.array(ct.fit_transform(X), dtype=float)
+
+# Train-test split (same random_state as training)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Fit StandardScaler on training data
+sc = StandardScaler()
+sc.fit(X_train)
+
+feature_columns = list(dataset.columns[3:13])
+print("[OK] Preprocessing objects ready!")
 print(f"Feature columns: {feature_columns}")
 
 # ============================================================
@@ -59,19 +78,15 @@ def predict():
     try:
         # Get form data
         credit_score = int(request.form['credit_score'])
-        geography = request.form['geography']           # France, Germany, or Spain
-        gender = request.form['gender']                 # Male or Female
+        geography = request.form['geography']
+        gender = request.form['gender']
         age = int(request.form['age'])
         tenure = int(request.form['tenure'])
         balance = float(request.form['balance'])
         num_of_products = int(request.form['num_of_products'])
-        has_cr_card = int(request.form['has_cr_card'])       # 0 or 1
-        is_active_member = int(request.form['is_active_member'])  # 0 or 1
+        has_cr_card = int(request.form['has_cr_card'])
+        is_active_member = int(request.form['is_active_member'])
         estimated_salary = float(request.form['estimated_salary'])
-
-        # Create input array in the SAME order as training features:
-        # [CreditScore, Geography, Gender, Age, Tenure, Balance,
-        #  NumOfProducts, HasCrCard, IsActiveMember, EstimatedSalary]
 
         # Encode Gender using the saved LabelEncoder
         gender_encoded = le_gender.transform([gender])[0]
@@ -79,7 +94,7 @@ def predict():
         # Build the raw input array (before OneHotEncoding)
         input_data = np.array([[
             credit_score,
-            geography,         # Will be OneHot encoded by ColumnTransformer
+            geography,
             gender_encoded,
             age,
             tenure,
@@ -102,20 +117,19 @@ def predict():
 
         # Determine result message
         if prediction == 1:
-            result = "Will Leave the Bank 😟"
+            result = "Will Leave the Bank"
             result_class = "negative"
         else:
-            result = "Will Stay with the Bank 😊"
+            result = "Will Stay with the Bank"
             result_class = "positive"
 
-        probability = round(prediction_prob * 100, 2)
+        probability = round(float(prediction_prob) * 100, 2)
 
         return render_template(
             'index.html',
             prediction=result,
             result_class=result_class,
             probability=probability,
-            # Pass back form values to retain them after submission
             credit_score=credit_score,
             geography=geography,
             gender=gender,
@@ -129,7 +143,6 @@ def predict():
         )
 
     except Exception as e:
-        # Handle errors gracefully
         error_msg = f"Error: {str(e)}. Please check your inputs and try again."
         return render_template('index.html', error=error_msg)
 
