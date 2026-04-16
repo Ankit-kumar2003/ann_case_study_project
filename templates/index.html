@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bank Customer Churn Prediction using Artificial Neural Network (ANN). Predict whether a customer will leave or stay with the bank.">
+    <title>Bank Churn Predictor | ANN Case Study</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="neural-node node-1"></div>
+        <div class="neural-node node-2"></div>
+        <div class="neural-node node-3"></div>
+        <div class="neural-node node-4"></div>
+        <div class="neural-node node-5"></div>
+        <div class="neural-node node-6"></div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="header" id="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="material-icons-outlined logo-icon">psychology</span>
+                    <h1>ChurnPredict<span class="accent">AI</span></h1>
+                </div>
+                <p class="tagline">Artificial Neural Network &mdash; Bank Customer Churn Prediction</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Info Banner -->
+            <div class="info-banner" id="info-banner">
+                <span class="material-icons-outlined">info</span>
+                <p>Enter customer details below to predict whether they will <strong>leave</strong> or <strong>stay</strong> with the bank using our trained ANN model.</p>
+            </div>
+
+            <!-- Prediction Result (shown only after form submission) -->
+            {% if prediction %}
+            <div class="result-card {{ result_class }}" id="result-card">
+                <div class="result-header">
+                    <span class="material-icons-outlined result-icon">
+                        {% if result_class == 'positive' %}verified{% else %}warning{% endif %}
+                    </span>
+                    <h2>Prediction Result</h2>
+                </div>
+                <div class="result-body">
+                    <p class="result-text">{{ prediction }}</p>
+                    <div class="probability-bar-container">
+                        <div class="probability-label">
+                            <span>Churn Probability</span>
+                            <span class="probability-value">{{ probability }}%</span>
+                        </div>
+                        <div class="probability-bar">
+                            <div class="probability-fill" style="width: {{ probability }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="error-card" id="error-card">
+                <span class="material-icons-outlined">error_outline</span>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Prediction Form -->
+            <form action="/predict" method="POST" class="prediction-form" id="prediction-form">
+                <div class="form-header">
+                    <span class="material-icons-outlined">edit_note</span>
+                    <h2>Customer Information</h2>
+                </div>
+
+                <div class="form-grid">
+                    <!-- Credit Score -->
+                    <div class="form-group" id="input-credit-score">
+                        <label for="credit_score">
+                            <span class="material-icons-outlined">credit_score</span>
+                            Credit Score
+                        </label>
+                        <input type="number" id="credit_score" name="credit_score" 
+                               value="{{ credit_score if credit_score else '' }}"
+                               placeholder="e.g., 650" min="300" max="900" required>
+                        <span class="helper-text">Range: 300 – 900</span>
+                    </div>
+
+                    <!-- Geography -->
+                    <div class="form-group" id="input-geography">
+                        <label for="geography">
+                            <span class="material-icons-outlined">public</span>
+                            Geography
+                        </label>
+                        <select id="geography" name="geography" required>
+                            <option value="" disabled {% if not geography %}selected{% endif %}>Select Country</option>
+                            <option value="France" {% if geography == 'France' %}selected{% endif %}>France</option>
+                            <option value="Germany" {% if geography == 'Germany' %}selected{% endif %}>Germany</option>
+                            <option value="Spain" {% if geography == 'Spain' %}selected{% endif %}>Spain</option>
+                        </select>
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="form-group" id="input-gender">
+                        <label for="gender">
+                            <span class="material-icons-outlined">person</span>
+                            Gender
+                        </label>
+                        <select id="gender" name="gender" required>
+                            <option value="" disabled {% if not gender %}selected{% endif %}>Select Gender</option>
+                            <option value="Male" {% if gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if gender == 'Female' %}selected{% endif %}>Female</option>
+                        </select>
+                    </div>
+
+                    <!-- Age -->
+                    <div class="form-group" id="input-age">
+                        <label for="age">
+                            <span class="material-icons-outlined">cake</span>
+                            Age
+                        </label>
+                        <input type="number" id="age" name="age"
+                               value="{{ age if age else '' }}"
+                               placeholder="e.g., 35" min="18" max="100" required>
+                        <span class="helper-text">Range: 18 – 100</span>
+                    </div>
+
+                    <!-- Tenure -->
+                    <div class="form-group" id="input-tenure">
+                        <label for="tenure">
+                            <span class="material-icons-outlined">hourglass_top</span>
+                            Tenure (years)
+                        </label>
+                        <input type="number" id="tenure" name="tenure"
+                               value="{{ tenure if tenure is not none else '' }}"
+                               placeholder="e.g., 5" min="0" max="10" required>
+                        <span class="helper-text">Range: 0 – 10 years</span>
+                    </div>
+
+                    <!-- Balance -->
+                    <div class="form-group" id="input-balance">
+                        <label for="balance">
+                            <span class="material-icons-outlined">account_balance_wallet</span>
+                            Balance ($)
+                        </label>
+                        <input type="number" id="balance" name="balance"
+                               value="{{ balance if balance is not none else '' }}"
+                               placeholder="e.g., 75000.00" step="0.01" min="0" required>
+                        <span class="helper-text">Account balance in USD</span>
+                    </div>
+
+                    <!-- Number of Products -->
+                    <div class="form-group" id="input-num-products">
+                        <label for="num_of_products">
+                            <span class="material-icons-outlined">inventory_2</span>
+                            Number of Products
+                        </label>
+                        <select id="num_of_products" name="num_of_products" required>
+                            <option value="" disabled {% if not num_of_products %}selected{% endif %}>Select</option>
+                            <option value="1" {% if num_of_products == 1 %}selected{% endif %}>1</option>
+                            <option value="2" {% if num_of_products == 2 %}selected{% endif %}>2</option>
+                            <option value="3" {% if num_of_products == 3 %}selected{% endif %}>3</option>
+                            <option value="4" {% if num_of_products == 4 %}selected{% endif %}>4</option>
+                        </select>
+                    </div>
+
+                    <!-- Has Credit Card -->
+                    <div class="form-group" id="input-has-cr-card">
+                        <label for="has_cr_card">
+                            <span class="material-icons-outlined">credit_card</span>
+                            Has Credit Card?
+                        </label>
+                        <select id="has_cr_card" name="has_cr_card" required>
+                            <option value="" disabled {% if has_cr_card is not defined or has_cr_card is none %}selected{% endif %}>Select</option>
+                            <option value="1" {% if has_cr_card == 1 %}selected{% endif %}>Yes</option>
+                            <option value="0" {% if has_cr_card == 0 %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+
+                    <!-- Is Active Member -->
+                    <div class="form-group" id="input-is-active">
+                        <label for="is_active_member">
+                            <span class="material-icons-outlined">trending_up</span>
+                            Is Active Member?
+                        </label>
+                        <select id="is_active_member" name="is_active_member" required>
+                            <option value="" disabled {% if is_active_member is not defined or is_active_member is none %}selected{% endif %}>Select</option>
+                            <option value="1" {% if is_active_member == 1 %}selected{% endif %}>Yes</option>
+                            <option value="0" {% if is_active_member == 0 %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+
+                    <!-- Estimated Salary -->
+                    <div class="form-group" id="input-salary">
+                        <label for="estimated_salary">
+                            <span class="material-icons-outlined">payments</span>
+                            Estimated Salary ($)
+                        </label>
+                        <input type="number" id="estimated_salary" name="estimated_salary"
+                               value="{{ estimated_salary if estimated_salary else '' }}"
+                               placeholder="e.g., 50000.00" step="0.01" min="0" required>
+                        <span class="helper-text">Annual salary in USD</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-actions">
+                    <button type="submit" class="btn-predict" id="btn-predict">
+                        <span class="material-icons-outlined">auto_awesome</span>
+                        Predict Churn
+                    </button>
+                    <button type="reset" class="btn-reset" id="btn-reset">
+                        <span class="material-icons-outlined">restart_alt</span>
+                        Reset Form
+                    </button>
+                </div>
+            </form>
+
+            <!-- About Section -->
+            <section class="about-section" id="about-section">
+                <div class="about-header">
+                    <span class="material-icons-outlined">school</span>
+                    <h2>About This Project</h2>
+                </div>
+                <div class="about-grid">
+                    <div class="about-card">
+                        <span class="material-icons-outlined">dataset</span>
+                        <h3>Dataset</h3>
+                        <p>10,000 bank customers with 14 features including demographics, account info, and activity status.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="material-icons-outlined">memory</span>
+                        <h3>ANN Architecture</h3>
+                        <p>2 hidden layers (64 &amp; 32 neurons) with ReLU activation, Dropout regularization, and Sigmoid output.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="material-icons-outlined">tune</span>
+                        <h3>Training</h3>
+                        <p>Adam optimizer, Binary Cross-Entropy loss, 100 epochs, batch size 32 with 10% validation split.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="material-icons-outlined">analytics</span>
+                        <h3>Goal</h3>
+                        <p>Predict whether a bank customer will churn (leave) based on their profile and behavior patterns.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer" id="footer">
+        <div class="container">
+            <p>&copy; 2026 ChurnPredictAI &mdash; ANN Case Study Project</p>
+            <p class="footer-tech">Built with TensorFlow, Keras, Flask &amp; ❤️</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll animation for result card
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultCard = document.getElementById('result-card');
+            if (resultCard) {
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Add animation to form groups on focus
+            const formGroups = document.querySelectorAll('.form-group');
+            formGroups.forEach(group => {
+                const input = group.querySelector('input, select');
+                if (input) {
+                    input.addEventListener('focus', () => group.classList.add('focused'));
+                    input.addEventListener('blur', () => group.classList.remove('focused'));
+                }
+            });
+
+            // Animate probability bar
+            const probFill = document.querySelector('.probability-fill');
+            if (probFill) {
+                const width = probFill.style.width;
+                probFill.style.width = '0%';
+                setTimeout(() => {
+                    probFill.style.width = width;
+                }, 300);
+            }
+        });
+    </script>
+</body>
+</html>
